@@ -11,7 +11,7 @@
 
 **Status: name reserved — first release in development.**
 
-Engine and docs: https://github.com/vicfei/dsh-vibe-trading
+Engine and docs: https://github.com/vicfei/dsh-Vibe-Trading
 
 - A-share / index / US K-lines, zero API keys, CN-cloud friendly
 - Stats + mini trend backtest + inline-SVG chart cards (offline-safe)

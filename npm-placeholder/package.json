@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "description": "Interactive trading research for DeepSeek Harness — orchestrated plan→data→compute→explain loop; every number from a deterministic compute layer, every finding cites its computation; zero-dependency SVG chart cards and auditable research trails. Inspired by HKUDS/Vibe-Trading (not affiliated). Name reserved; first release in development.",
   "keywords": ["deepseek-harness", "dsh", "dsh-plugin", "vibe-trading", "quant-research", "factor-analysis", "interactive-charts", "backtest", "ic-memo"],
-  "repository": {"type": "git", "url": "git+https://github.com/vicfei/dsh-vibe-trading.git"},
-  "homepage": "https://github.com/vicfei/dsh-vibe-trading#readme",
+  "repository": {"type": "git", "url": "git+https://github.com/vicfei/dsh-Vibe-Trading.git"},
+  "homepage": "https://github.com/vicfei/dsh-Vibe-Trading#readme",
   "license": "MIT",
   "author": "vicfei"
 }

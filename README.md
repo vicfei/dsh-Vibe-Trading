@@ -25,7 +25,7 @@ You get a terminal brief, a zero-dependency SVG chart card, and an auditable tra
 ## Quick start (zero extra keys)
 
 ```bash
-git clone https://github.com/vicfei/dsh-vibe-trading && cd dsh-vibe-trading
+git clone https://github.com/vicfei/dsh-Vibe-Trading && cd dsh-vibe-trading
 python3 scripts/vibe_research.py --save \
   --question "茅台 vs 上证指数：近 20 日谁更弱，量价结构给出什么信号？" \
   --symbols sh600519,sh000001
