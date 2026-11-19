@@ -24,6 +24,18 @@ def avail(value, requirement):
     return value
 
 
+def coverage_gaps(rows, threshold=GAP_DAYS):
+    """calendar-day jumps above threshold, reported as possible data holes"""
+    gaps = []
+    for i in range(1, len(rows)):
+        a = dt.date.fromisoformat(rows[i - 1][0][:10])
+        b = dt.date.fromisoformat(rows[i][0][:10])
+        ndays = (b - a).days
+        if ndays > threshold:
+            gaps.append({"from": rows[i - 1][0], "to": rows[i][0], "calendar_days": ndays})
+    return gaps
+
+
 def kline(symbol):
     """symbol: sh600519 / sz000001 / sh000001(index) / usNVDA
     → (rows, meta): rows = [(date, open, close, high, low, volume)], meta rides with the data."""
@@ -35,18 +47,11 @@ def kline(symbol):
     node = d["data"][symbol]
     days = node.get("qfqday") or node.get("day")
     rows = [(r[0], float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])) for r in days]
-    gaps = []
-    for i in range(1, len(rows)):
-        a = dt.date.fromisoformat(rows[i - 1][0][:10])
-        b = dt.date.fromisoformat(rows[i][0][:10])
-        ndays = (b - a).days
-        if ndays > GAP_DAYS:
-            gaps.append({"from": rows[i - 1][0], "to": rows[i][0], "calendar_days": ndays})
     meta = {"source": "tencent-ifzq", "adjustment": "qfq (forward-adjusted)",
             "symbol": symbol, "bars": len(rows), "requested_bars": 320,
             "date_range": [rows[0][0], rows[-1][0]],
             "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-            "coverage_gaps": gaps}
+            "coverage_gaps": coverage_gaps(rows)}
     return rows, meta
 
 
@@ -121,6 +126,7 @@ def sma_cross_backtest(rows, train_frac=0.7):
     hold["span"] = [rows[split][0], rows[-1][0]]
     return {"trades": trades,
             "win_rate": _win_rate(trade_rets),
+            "trade_returns": trade_rets,
             "sum_strategy": (math.prod(1 + r for r in trade_rets) - 1) if trade_rets else 0.0,
             "buy_hold_260d": c[-1] / c[60] - 1 if len(c) > 60 else {"unavailable": "window too short"},
             "train": train, "holdout": hold,
