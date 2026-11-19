@@ -136,20 +136,7 @@ def run_research(question, symbols_csv):
     t0 = time.time()
     plan = parse_json_loose(llm(t("plan_prompt"),
                                 f"Question: {question}\nSymbols: {symbols_csv}", json_out=True))
-    rows_map, datasets, stats, backtests, svgs = {}, {}, {}, {}, []
-    for sym in [s.strip() for s in symbols_csv.split(",") if s.strip()]:
-        try:
-            rows, meta = kline(sym)
-        except Exception as e:
-            print(t("fetch_fail", sym=sym, e=e), file=sys.stderr)
-            continue
-        rows_map[sym] = rows
-        datasets[sym] = meta
-        stats[sym] = stats_block(rows, sym)
-        backtests[sym] = sma_cross_backtest(rows)
-        svgs.append(svg_chart(rows, sym, meta))
-    if not rows_map:
-        raise SystemExit("no symbol data fetched — nothing to research")
+    rows_map, datasets, stats, backtests, svgs = _fetch_bundle(symbols_csv)
     computed = json.dumps({"stats": stats, "backtests": backtests}, ensure_ascii=False, indent=1, default=str)
     findings = llm(t("interpret_prompt"),
                    f"Research question: {question}\nPlan: {json.dumps(plan, ensure_ascii=False)}\n"
@@ -249,7 +236,12 @@ def render_brief(trail):
         print(t("oos_note_line", note=note))
     if trail.get("board"):
         render_board(trail)
-    print(f"\n{t('findings')}\n\n{trail.get('findings', '')}\n" if trail.get("findings") else "")
+    if trail.get("session"):
+        print("\n## session")
+        for i, qa in enumerate(trail["session"], 1):
+            print(f"\n**Q{i}**: {qa.get('q', '')}\n\n{qa.get('findings', '')}")
+    elif trail.get("findings"):
+        print(f"\n{t('findings')}\n\n{trail.get('findings', '')}\n")
     art = trail.get("artifact")
     if art:
         print(f"── artifact {art['name']} · r{art['rev']} · saved {art['saved_at']}")
@@ -258,6 +250,79 @@ def render_brief(trail):
         print(f"── scan · {secs}s · deterministic, zero LLM calls · numbers from code only")
     elif secs is not None:
         print(t("footer", secs=secs))
+
+
+def _fetch_bundle(symbols_csv):
+    rows_map, datasets, stats, backtests, svgs = {}, {}, {}, {}, []
+    for sym in [s.strip() for s in symbols_csv.split(",") if s.strip()]:
+        try:
+            rows, meta = kline(sym)
+        except Exception as e:
+            print(t("fetch_fail", sym=sym, e=e), file=sys.stderr)
+            continue
+        rows_map[sym] = rows
+        datasets[sym] = meta
+        stats[sym] = stats_block(rows, sym)
+        backtests[sym] = sma_cross_backtest(rows)
+        svgs.append(svg_chart(rows, sym, meta))
+    if not rows_map:
+        raise SystemExit("no symbol data fetched — nothing to research")
+    return rows_map, datasets, stats, backtests, svgs
+
+
+def run_chat(symbols_csv, name):
+    """Multi-question session: one data fetch, many questions (V3.3).
+    First question plans + interprets; follow-ups interpret on the cached
+    computed layer (one LLM call each). /data /refresh /save /quit."""
+    rows_map, datasets, stats, backtests, svgs = _fetch_bundle(symbols_csv)
+    session, planned, first_q, saved_len = [], None, None, -1
+    print(f"vibe session · symbols {symbols_csv} · data cached ({len(rows_map)} ok) · /data /refresh /save /quit")
+    while True:
+        try:
+            q = input("vibe> ").strip()
+        except EOFError:
+            print()
+            break
+        if not q:
+            continue
+        if q == "/quit":
+            break
+        if q == "/refresh":
+            rows_map, datasets, stats, backtests, svgs = _fetch_bundle(symbols_csv)
+            print(f"data refreshed ({len(rows_map)} symbols)")
+            continue
+        if q == "/data":
+            render_brief({"question": "(cached data)", "plan": {"plan": ""},
+                          "datasets": datasets, "stats": stats, "backtests": backtests,
+                          "findings": "", "secs": None})
+            continue
+        if q == "/save":
+            if not session:
+                print("nothing to save yet — ask a question first")
+                continue
+            import artifacts
+            trail = {"schema": "research-trail/1", "question": first_q,
+                     "plan": planned or {"plan": ""},
+                     "datasets": datasets, "stats": stats, "backtests": backtests,
+                     "findings": session[-1]["findings"], "session": session, "_html": None}
+            rev, base = artifacts.save(name or "session", trail)
+            saved_len = len(session)
+            print(f"saved artifact r{rev} → {base}.json")
+            continue
+        if planned is None:
+            planned = parse_json_loose(llm(t("plan_prompt"),
+                                           f"Question: {q}\nSymbols: {symbols_csv}", json_out=True))
+            first_q = q
+        computed = json.dumps({"stats": stats, "backtests": backtests},
+                               ensure_ascii=False, indent=1, default=str)
+        findings = llm(t("interpret_prompt"),
+                       f"Research question: {q}\nPlan: {json.dumps(planned, ensure_ascii=False)}\n"
+                       f"Symbols covered: {list(rows_map)}\nComputed results:\n{computed}\n"
+                       f"(session context — earlier Q&A: {json.dumps(session[-3:], ensure_ascii=False)})")
+        session.append({"q": q, "findings": findings})
+        print(f"\n{findings}\n")
+    if session and name and len(session) != saved_len:
+        print("hint: unsaved questions since last /save — rerun with /save before /quit to keep them", file=sys.stderr)
 
 
 def main():
@@ -274,6 +339,10 @@ def main():
     run.add_argument("--save", action="store_true", help="save an anonymous timestamped trail")
     run.add_argument("--lang", choices=("en", "zh"), default="en",
                      help="output language (default en; zh is the fallback)")
+    chat = sub.add_parser("chat", help="multi-question session on cached data")
+    chat.add_argument("--symbols", required=True)
+    chat.add_argument("--name", help="artifact name for /save")
+    chat.add_argument("--lang", choices=("en", "zh"), default="en")
     scan = sub.add_parser("scan", help="deterministic cross-sectional board (no LLM calls)")
     scan.add_argument("--symbols", required=True)
     scan.add_argument("--board", required=True, choices=sorted(list(BOARDS) + ["correlation"]))
@@ -294,6 +363,11 @@ def main():
     ex.add_argument("-r", type=int, default=None, help="revision (default: latest)")
     ex.add_argument("--stdout", action="store_true")
     args = ap.parse_args(argv)
+
+    if args.cmd == "chat":
+        LANG = args.lang
+        run_chat(args.symbols, args.name)
+        return
 
     if args.cmd == "scan":
         LANG = args.lang
