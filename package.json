@@ -1,7 +1,7 @@
 {
   "name": "dsh-vibe-trading",
-  "version": "0.1.0",
-  "description": "Interactive trading research workbench for DeepSeek Harness — an orchestrated plan→data→compute→explain loop where every number comes from a deterministic layer (LLM interprets, never produces figures), with honest-unavailable semantics, source metadata riding on every dataset, out-of-sample backtest discipline, zero-dependency SVG chart cards, and auditable research trails.",
+  "version": "0.3.0",
+  "description": "Interactive trading research workbench for DeepSeek Harness \u2014 orchestrated plan\u2192data\u2192compute\u2192explain loop where every number comes from a deterministic layer (LLM interprets, never produces figures). Honest-unavailable semantics, source metadata riding on every dataset, out-of-sample backtest discipline, MACD/RSI/correlation indicators, deterministic screener boards, multi-question chat sessions, versioned append-only research artifacts with revision diff, typed DSH host tools, zero-dependency SVG cards.",
   "bin": {
     "dsh-vibe-trading": "bin/dsh-vibe-trading.js"
   },
@@ -26,6 +26,7 @@
     "SKILL.md",
     "README.md",
     "README.zh-CN.md",
+    "CHANGELOG.md",
     "ROADMAP.md",
     "LICENSE"
   ],
