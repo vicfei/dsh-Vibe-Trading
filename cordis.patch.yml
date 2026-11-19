@@ -1,0 +1,7 @@
+# dsh-vibe-trading bundle layer: inserts the plugin into the profile's layer stack.
+# The skill (skills/dsh-vibe-trading/SKILL.md) is discovered by dsh-skill-filesystem;
+# the CLI stays on PATH via the npm bin. The engine itself is stdlib-only Python
+# (scripts/vibe_research.py + scripts/market_data.py) — nothing to bundle beyond discovery.
+- insert:
+    - id: dsh-vibe-trading
+      name: 'dsh-vibe-trading'

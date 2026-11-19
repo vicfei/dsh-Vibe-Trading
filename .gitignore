@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
-trails/
+node_modules/
+*.tgz
+trails/*.html
+trails/*.json

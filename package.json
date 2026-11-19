@@ -1,0 +1,50 @@
+{
+  "name": "dsh-vibe-trading",
+  "version": "0.1.0",
+  "description": "Interactive trading research workbench for DeepSeek Harness — an orchestrated plan→data→compute→explain loop where every number comes from a deterministic layer (LLM interprets, never produces figures), with honest-unavailable semantics, source metadata riding on every dataset, out-of-sample backtest discipline, zero-dependency SVG chart cards, and auditable research trails.",
+  "bin": {
+    "dsh-vibe-trading": "bin/dsh-vibe-trading.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "manifestVersion": 1
+  },
+  "files": [
+    "bin",
+    "scripts/*.py",
+    "skills",
+    "cordis.patch.yml",
+    "SKILL.md",
+    "README.md",
+    "README.zh-CN.md",
+    "ROADMAP.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "python3 tests/test_engine.py && node bin/dsh-vibe-trading.js --help"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "vibe-trading",
+    "quant-research",
+    "technical-analysis",
+    "backtesting",
+    "research-trail",
+    "interactive-charts",
+    "ic-memo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vicfei/dsh-Vibe-Trading.git"
+  },
+  "homepage": "https://github.com/vicfei/dsh-Vibe-Trading#readme",
+  "license": "MIT",
+  "author": "vicfei"
+}
