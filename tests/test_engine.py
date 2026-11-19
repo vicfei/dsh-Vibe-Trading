@@ -132,5 +132,32 @@ with tempfile.TemporaryDirectory() as td:
     finally:
         os.environ.pop("VIBE_TRAILS_DIR", None)
 
+# 9. indicator library known-answer checks (V3.2)
+up = [100.0 * (1.01 ** i) for i in range(40)]
+check("rsi monotonic-up = 100", md.rsi(up, 14) == 100.0)
+check("rsi short series None", md.rsi(up[:10], 14) is None)
+flat = [100.0] * 40
+check("macd hist flat = 0", abs(md.macd(flat)[2][-1]) < 1e-9)
+check("pearson self = 1", abs(md.pearson(up[1:], up[1:]) - 1.0) < 1e-9)
+a = [1, 2, 3, 4, 5]
+b = [5, 4, 3, 2, 1]
+check("pearson inverse = -1", abs(md.pearson(a, b) + 1.0) < 1e-9)
+def _cum(rets):
+    out, p = [100.0], 100.0
+    for r in rets:
+        p *= (1 + r)
+        out.append(p)
+    return out
+
+
+rx = [0.01 * ((i % 5) - 2) for i in range(80)]
+cm = md.corr_matrix({"x": _cum(rx), "y": _cum([-r for r in rx])})
+check("corr matrix inverse pair", abs(cm["x"]["y"] + 1.0) < 1e-9)
+
+# 10. rank_syms: unavailable ranks last, deterministic (V3.1)
+rstats = {"aaa": {"ret20": 0.02}, "zzz": {"ret20": 0.09}, "bad": {"ret20": {"unavailable": "x"}}, "ccc": {"ret20": -0.01}}
+check("rank desc with unavailable last", md.rank_syms(rstats, "ret20") == ["zzz", "aaa", "ccc", "bad"])
+check("rank all-unavailable deterministic", md.rank_syms({"b": {"ret20": {"unavailable": "1"}}, "a": {"ret20": {"unavailable": "2"}}}, "ret20") == ["a", "b"])
+
 print("result:", "GREEN" if not FAILS else "RED (%d)" % len(FAILS))
 sys.exit(1 if FAILS else 0)

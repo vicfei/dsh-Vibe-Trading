@@ -24,6 +24,7 @@ Usage:
 import argparse, datetime as dt, json, os, re, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import market_data as md
 from market_data import kline, stats_block, sma_cross_backtest, svg_chart
 
 KIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,7 +38,7 @@ STR = {
         "question": "## Question: {q}",
         "plan": "**plan**",
         "computed": "## Computed results (summary)",
-        "sym_line": "- **{sym}**: last {last} · 20d {ret20} · 60d {ret60} · {above} SMA60 · 30d vol {vol30} · from 120d peak {dd} · volume z {vz}",
+        "sym_line": "- **{sym}**: last {last} · 20d {ret20} · 60d {ret60} · {above} SMA60 · 30d vol {vol30} · from 120d peak {dd} · volume z {vz} · RSI14 {rsi} · MACD-h {macdh}",
         "above_yes": "above",
         "above_no": "below",
         "src_line": "  - data: {src}",
@@ -65,7 +66,7 @@ STR = {
         "question": "## 研究问题：{q}",
         "plan": "**plan**",
         "computed": "## 计算结果（摘要）",
-        "sym_line": "- **{sym}**: 现价 {last} · 20日 {ret20} · 60日 {ret60} · {above} SMA60 · 30日波动 {vol30} · 距120日峰 {dd} · 量能z {vz}",
+        "sym_line": "- **{sym}**: 现价 {last} · 20日 {ret20} · 60日 {ret60} · {above} SMA60 · 30日波动 {vol30} · 距120日峰 {dd} · 量能z {vz} · RSI14 {rsi} · MACD-h {macdh}",
         "above_yes": "站稳",
         "above_no": "跌破",
         "src_line": "  - 数据: {src}",
@@ -164,6 +165,60 @@ def run_research(question, symbols_csv):
             "findings": findings, "secs": int(time.time() - t0), "_html": html}
 
 
+BOARDS = {"momentum": "ret20", "volatility": "vol30", "volume": "vol_z20"}
+
+
+def run_scan(symbols_csv, board):
+    """Deterministic cross-sectional scan — zero LLM calls."""
+    t0 = time.time()
+    stats, datasets, closes_map = {}, {}, {}
+    for sym in [s.strip() for s in symbols_csv.split(",") if s.strip()]:
+        try:
+            rows, meta = kline(sym)
+        except Exception as e:
+            print(t("fetch_fail", sym=sym, e=e), file=sys.stderr)
+            continue
+        stats[sym] = stats_block(rows, sym)
+        datasets[sym] = meta
+        closes_map[sym] = md.closes(rows)
+    if not stats:
+        raise SystemExit("no symbol data fetched — nothing to scan")
+    trail = {"schema": "research-trail/1", "question": f"scan:{board} over {symbols_csv}",
+             "plan": {"plan": "deterministic scan — no LLM calls, numbers from code only"},
+             "datasets": datasets, "stats": stats, "backtests": {}, "findings": "",
+             "board": board, "secs": int(time.time() - t0)}
+    if board == "correlation":
+        trail["correlation"] = md.corr_matrix(closes_map, 60)
+    else:
+        trail["board_ranking"] = md.rank_syms(stats, BOARDS[board])
+    return trail
+
+
+def render_board(trail):
+    board = trail.get("board")
+    if not board:
+        return
+    print(f"\n## board: {board} · deterministic ranking · unavailable ranks last\n")
+    stats = trail.get("stats", {})
+    if board == "correlation":
+        cm = trail.get("correlation", {})
+        syms = list(cm)
+        print("| | " + " | ".join(syms) + " |")
+        print("|---|" + "---|" * len(syms))
+        for a in syms:
+            print(f"| **{a}** | " + " | ".join(f(cm[a].get(b), "{:+.2f}") for b in syms) + " |")
+    else:
+        key = BOARDS[board]
+        ranked = trail.get("board_ranking") or list(stats)
+        print(f"| rank | symbol | {key} (board key) | ret20 | vol30 | vol_z20 | rsi14 |")
+        print("|---|---|---|---|---|---|---|")
+        for i, sym in enumerate(ranked, 1):
+            st = stats[sym]
+            print(f"| {i} | {sym} | {f(st.get(key), '{:+.4g}')} | {f(st.get('ret20'), '{:+.1%}')} "
+                  f"| {f(st.get('vol30'), '{:.0%}')} | {f(st.get('vol_z20'), '{:+.1f}')} "
+                  f"| {f(st.get('rsi14'), '{:.0f}')} |")
+
+
 def render_brief(trail):
     """Terminal brief, live runs and stored revisions alike."""
     print(t("question", q=trail.get("question", "")) + "\n")
@@ -176,7 +231,8 @@ def render_brief(trail):
                 ret60=f(st["ret60"], "{:+.1%}"),
                 above=t("above_yes") if above is True else (t("above_no") if above is False else f(above, "{}")),
                 vol30=f(st["vol30"], "{:.0%}"), dd=f(st["dd_from_120d_peak"], "{:+.1%}"),
-                vz=f(st["vol_z20"], "{:+.1f}")))
+                vz=f(st["vol_z20"], "{:+.1f}"), rsi=f(st.get("rsi14", {"unavailable": "n/a"}), "{:.0f}"),
+                macdh=f(st.get("macd_hist", {"unavailable": "n/a"}), "{:+.2f}")))
         if sym in trail.get("datasets", {}):
             print(t("src_line", src=src_text(trail["datasets"][sym])))
         bt = trail.get("backtests", {}).get(sym)
@@ -191,19 +247,23 @@ def render_brief(trail):
             oos_notes.add(bt["oos_note"])
     for note in oos_notes:
         print(t("oos_note_line", note=note))
-    print(f"\n{t('findings')}\n\n{trail.get('findings', '')}\n")
+    if trail.get("board"):
+        render_board(trail)
+    print(f"\n{t('findings')}\n\n{trail.get('findings', '')}\n" if trail.get("findings") else "")
     art = trail.get("artifact")
     if art:
         print(f"── artifact {art['name']} · r{art['rev']} · saved {art['saved_at']}")
     secs = trail.get("secs")
-    if secs is not None:
+    if trail.get("board"):
+        print(f"── scan · {secs}s · deterministic, zero LLM calls · numbers from code only")
+    elif secs is not None:
         print(t("footer", secs=secs))
 
 
 def main():
     global LANG
     argv = sys.argv[1:]
-    if argv[:1] not in (["run"], ["artifacts"]) and argv:
+    if argv[:1] not in (["run"], ["artifacts"], ["scan"], ["chat"]) and argv:
         argv = ["run"] + argv
     ap = argparse.ArgumentParser(prog="dsh-vibe-trading")
     sub = ap.add_subparsers(dest="cmd")
@@ -214,6 +274,11 @@ def main():
     run.add_argument("--save", action="store_true", help="save an anonymous timestamped trail")
     run.add_argument("--lang", choices=("en", "zh"), default="en",
                      help="output language (default en; zh is the fallback)")
+    scan = sub.add_parser("scan", help="deterministic cross-sectional board (no LLM calls)")
+    scan.add_argument("--symbols", required=True)
+    scan.add_argument("--board", required=True, choices=sorted(list(BOARDS) + ["correlation"]))
+    scan.add_argument("--name", help="save as a named versioned artifact")
+    scan.add_argument("--lang", choices=("en", "zh"), default="en")
     art = sub.add_parser("artifacts", help="versioned research artifacts (append-only)")
     asub = art.add_subparsers(dest="action", required=True)
     asub.add_parser("list")
@@ -229,6 +294,16 @@ def main():
     ex.add_argument("-r", type=int, default=None, help="revision (default: latest)")
     ex.add_argument("--stdout", action="store_true")
     args = ap.parse_args(argv)
+
+    if args.cmd == "scan":
+        LANG = args.lang
+        trail = run_scan(args.symbols, args.board)
+        render_brief(trail)
+        if args.name:
+            import artifacts
+            rev, base = artifacts.save(args.name, trail)
+            print(t("saved", base=base) + f" (artifact {artifacts.slugify(args.name)} r{rev})", file=sys.stderr)
+        return
 
     if args.cmd == "artifacts":
         import artifacts
