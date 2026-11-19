@@ -47,6 +47,12 @@ def kline(symbol):
     node = d["data"][symbol]
     days = node.get("qfqday") or node.get("day")
     rows = [(r[0], float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])) for r in days]
+    if symbol.startswith("us") and len(rows) < 30:
+        # known upstream limitation: the tencent US endpoint currently returns
+        # only boundary bars for some tickers — fail honestly instead of
+        # computing on a degenerate series
+        raise ValueError(f"tencent US endpoint returned {len(rows)} bars for {symbol} "
+                         "(boundary-only response; US history is degraded — tracked for a fallback source)")
     meta = {"source": "tencent-ifzq", "adjustment": "qfq (forward-adjusted)",
             "symbol": symbol, "bars": len(rows), "requested_bars": 320,
             "date_range": [rows[0][0], rows[-1][0]],
@@ -61,6 +67,80 @@ def closes(rows):
 
 def sma(xs, n):
     return [sum(xs[max(0, i - n + 1):i + 1]) / len(xs[max(0, i - n + 1):i + 1]) for i in range(len(xs))]
+
+
+def ema(xs, n):
+    """standard exponential moving average, seeded with the first value"""
+    out, k = [], 2 / (n + 1)
+    for i, x in enumerate(xs):
+        out.append(x if i == 0 else x * k + out[-1] * (1 - k))
+    return out
+
+
+def macd(xs, fast=12, slow=26, signal=9):
+    """→ (macd_line, signal_line, histogram); last-bar values are what stats carry"""
+    line = [a - b for a, b in zip(ema(xs, fast), ema(xs, slow))]
+    sig = ema(line, signal)
+    return line, sig, [a - b for a, b in zip(line, sig)]
+
+
+def rsi(xs, n=14):
+    """Wilder-smoothed RSI → last value"""
+    if len(xs) < n + 1:
+        return None
+    gains, losses = [], []
+    for i in range(1, len(xs)):
+        ch = xs[i] - xs[i - 1]
+        gains.append(max(ch, 0.0))
+        losses.append(max(-ch, 0.0))
+    ag, al = sum(gains[:n]) / n, sum(losses[:n]) / n
+    for i in range(n, len(gains)):
+        ag = (ag * (n - 1) + gains[i]) / n
+        al = (al * (n - 1) + losses[i]) / n
+    if al == 0:
+        return 100.0
+    rs = ag / al
+    return 100 - 100 / (1 + rs)
+
+
+def pearson(a, b):
+    n = len(a)
+    if n < 2:
+        return None
+    ma, mb = sum(a) / n, sum(b) / n
+    num = sum((a[i] - ma) * (b[i] - mb) for i in range(n))
+    da = sum((x - ma) ** 2 for x in a) ** 0.5
+    db = sum((x - mb) ** 2 for x in b) ** 0.5
+    return num / (da * db) if da and db else None
+
+
+def daily_returns(c):
+    return [c[i] / c[i - 1] - 1 for i in range(1, len(c))]
+
+
+def corr_matrix(closes_by_sym, window=60):
+    """pairwise correlation of the last `window` daily returns (aligned by tail)"""
+    rets = {s: daily_returns(c)[-window:] for s, c in closes_by_sym.items()}
+    out = {}
+    for a in rets:
+        out[a] = {}
+        for b in rets:
+            if a == b:
+                out[a][b] = 1.0
+            else:
+                n = min(len(rets[a]), len(rets[b]))
+                out[a][b] = avail(pearson(rets[a][-n:], rets[b][-n:]),
+                                  f"fewer than 2 aligned returns")
+    return out
+
+
+def rank_syms(stats, key):
+    """rank symbols by key, descending; unavailable ranks last — never dropped.
+    Deterministic: ties break alphabetically."""
+    def rk(item):
+        v = item[1].get(key)
+        return (1, "", 0.0) if isinstance(v, dict) else (0, "", -float(v))
+    return [s for s, _ in sorted(stats.items(), key=lambda it: (rk(it)[0], rk(it)[2], it[0]))]
 
 
 def stats_block(rows, label):
@@ -84,7 +164,9 @@ def stats_block(rows, label):
             "above_sma60": (c[-1] > s60[-1]) if n >= 60 else {"unavailable": f"needs >= 60 closes for SMA60, got {n}"},
             "vol30": need(31, lambda: (sum((c[i] / c[i - 1] - 1) ** 2 for i in range(-30, 0)) / 30) ** 0.5 * math.sqrt(252)),
             "dd_from_120d_peak": need(121, lambda: c[-1] / max(c[-120:]) - 1),
-            "vol_z20": need(21, lambda: vz)}
+            "vol_z20": need(21, lambda: vz),
+            "macd_hist": need(35, lambda: macd(c)[2][-1]),
+            "rsi14": need(15, lambda: avail(rsi(c, 14), "non-finite RSI"))}
 
 
 def _win_rate(rets):

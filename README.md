@@ -41,7 +41,10 @@ user-facing labels (and the interpreter's language) to Chinese.
 
 ## What's in the box
 
-- A-share / index / US K-lines via the CN-reachable Tencent ladder (no keys)
+- A-share / index K-lines via the CN-reachable Tencent ladder (no keys);
+  US history is currently **degraded upstream** (the endpoint returns boundary
+  bars only) — the engine refuses degenerate series honestly instead of
+  computing on them
 - Stats: ret20/60, SMA60 posture, 30d vol, drawdown from 120d peak, volume z-score
 - Mini trend backtest (SMA20/60 cross, position-only, fees excluded — structure probe, not advice)
 - Zero-dependency inline SVG chart cards (offline-safe, no CDN)
