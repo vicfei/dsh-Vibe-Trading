@@ -21,14 +21,21 @@
 | 产物 | 聊天文本 | **终端纪要 + 内联 SVG 交互卡 + 完整轨迹**（问题/规划/统计/回测/结论） |
 | 可审计性 | — | 每条结论指向产出它的计算；缺口如实声明 |
 
-## 快速开始（零额外 key）
+## 安装
 
 ```bash
-git clone https://github.com/vicfei/dsh-Vibe-Trading && cd dsh-vibe-trading
-python3 scripts/vibe_research.py --save \
-  --question "Moutai vs the Shanghai index: which leg is weaker?" \
-  --symbols sh600519,sh000001
-python3 scripts/vibe_research.py --question "茅台 vs 上证：量价结构谁更弱？" --lang zh   # 中文
+npm i -g dsh-vibe-trading          # 或：dsh plugin add dsh-vibe-trading
+dsh-vibe-trading run --question "Moutai vs the index: whose price-volume structure is weaker?" \
+  --symbols sh600519,sh000001 --name moutai-vs-index
+dsh-vibe-trading scan --symbols sh600519,sz000001,sh000001 --board momentum
+```
+
+需要 PATH 上有 `python3`（纯 stdlib，无 pip 安装）；npm 包同时注册宿主 typed
+tools（`vibe_research` / `vibe_scan`）与技能。源码方式：clone 后直接
+`python3 scripts/vibe_research.py`。
+
+```bash
+python3 scripts/vibe_research.py --question "茅台 vs 上证：量价结构谁更弱？" --symbols sh600519,sh000001 --lang zh   # 中文
 ```
 
 真实冒烟（2026-11-16，6 秒，2 次 LLM 调用，temperature=0）：识别指数为较弱腿
@@ -46,9 +53,11 @@ python3 scripts/vibe_research.py --question "茅台 vs 上证：量价结构谁�
 
 ## 状态与路线图
 
-v0 引擎已在真实数据上冒烟。见 [ROADMAP](ROADMAP.md)——V 系列依次交付：
-引擎硬化（诚实不可用语义务化/来源元数据随行/样本外纪律）、版本化研究工件、
-工作台（筛选器/指标库/多问题会话）、因子工坊与家族互通。
+v0.3.0——V1 硬化、V2 版本化工件、V3 工作台全部交付；35 项 hermetic 测试 +
+CI 绿；typed tools 已在真实宿主形状验证。见 [ROADMAP](ROADMAP.md)——V4 因子
+工坊+家族互通，V5 RESEARCH-TRAIL spec + WeKnora 问史库。盒内新增：MACD/RSI/
+相关性指标、确定性榜单（动量/波动/量能/相关性）、多问题会话、版本化 append-only
+研究工件与修订 diff。
 
 ## 致谢与免责
 

@@ -1,30 +1,38 @@
 ---
 name: dsh-vibe-trading
-description: Interactive trading research workbench for DeepSeek Harness — orchestrated plan→data→compute→explain loop; numbers only from the deterministic layer with honest-unavailable semantics, source metadata riding on every dataset, out-of-sample backtest discipline, zero-dependency SVG cards, auditable research trails.
+description: Interactive trading research workbench (Vibe-Trading style) for DeepSeek Harness — orchestrated plan→data→compute→explain loop, numbers from a deterministic layer only, honest-unavailable semantics, OOS backtest discipline, screener boards, versioned research artifacts, zero-dependency SVG chart cards.
 ---
 
 Use this skill when asked a market/quant research question ("which leg is
-weaker", "price-volume structure", "compare X and Y", "how is the trend at
-this level"). The loop is a deterministic script — you orchestrate, it
-computes. `dsh-vibe-trading` must be on PATH (installed with the package;
-requires python3, stdlib only). LLM key: the engine reads `DEEPSEEK_API_KEY`
-from ~/.bashrc export lines.
+weaker", "price-volume structure", "compare X and Y", "rank these symbols",
+"this position's trend"). The loop is a deterministic script — you orchestrate,
+it computes. Requires python3 on PATH (stdlib only); LLM key read from
+`DEEPSEEK_API_KEY` in ~/.bashrc.
 
 ## Run
 
 ```bash
-dsh-vibe-trading --question "Moutai vs the index: whose price-volume structure is weaker?" \
-  --symbols sh600519,sh000001 --save
-dsh-vibe-trading --question "<问题>" --symbols sh600519,sh000001 --lang zh   # Chinese fallback
+dsh-vibe-trading run --question "Moutai vs the index: whose price-volume structure is weaker?" \
+  --symbols sh600519,sh000001 --name moutai-vs-index
+dsh-vibe-trading run --question "<问题>" --symbols sh600519,sh000001 --lang zh   # Chinese fallback
+dsh-vibe-trading scan --symbols sh600519,sz000001,sh000001 --board momentum     # deterministic board
+dsh-vibe-trading chat --symbols sh600519,sh000001 --name my-session             # multi-question REPL
+dsh-vibe-trading artifacts list / show <name> / diff <name> 1 2 / export <name> # versioned trails
 ```
 
-Symbols: A-shares `sh`/`sz`+code, index `sh000001`, US `us`+code. Data rides
-with source metadata (tencent-ifzq, qfq, date range, coverage gaps).
+Symbols: A-share `sh`/`sz`+code, index `sh000001`; US history is degraded
+upstream and refused honestly. Data rides with source metadata (tencent-ifzq,
+qfq, date range, coverage gaps). Host tools `vibe_research` / `vibe_scan` are
+registered for agent presets.
 
 ## Discipline
 
-- Numbers come only from the deterministic layer; findings must cite [S#]/[F#]
-  fields; unavailable fields are reported as unavailable — never guessed around.
-- Backtests are structure probes (no fees, frozen a-priori params, in-sample vs
-  out-of-sample reported separately) — not advice.
-- Trails are append-only evidence; never edit a saved trail by hand.
+- Numbers only from the compute layer; findings must cite fields ([F#]); the model
+  never invents figures. Small samples get flagged as small samples.
+- Unavailable fields are reported as unavailable with a reason — never guessed
+  around, never rendered as 0.
+- Report "answered / still-missing" honestly — data gaps are part of the deliverable.
+- The HTML card is self-contained SVG (no CDN) — safe to share/attach.
+- Backtests are fee-free structural probes with in-sample/out-of-sample split;
+  never present them as advice.
+- Trails and artifact revisions are append-only evidence — never edit by hand.

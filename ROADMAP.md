@@ -41,39 +41,39 @@ LLM plans → deterministic layer (K-lines / stats / SMA-cross backtest /
 inline SVG) → LLM interprets with [F#] field citations and small-sample
 self-exposure. Real data 6s per run (茅台 vs 上证), trail HTML+JSON on disk.
 
-### V1 · Release train + engine hardening → npm 0.1.0 (next session)
-- [ ] V1.1 EN-first: engine output English default + `--lang zh` fallback;
+### V1 · Release train + engine hardening ✅ (2026-11-19)
+- [x] V1.1 EN-first: engine output English default + `--lang zh` fallback;
       README pure EN + `README.zh-CN.md` translation (international-first rule)
-- [ ] V1.2 honest-unavailable semantics: every stat/backtest field is
+- [x] V1.2 honest-unavailable semantics: every stat/backtest field is
       `{value | unavailable + reason}` (insufficient sample / missing data /
       non-finite) — never 0, never silently dropped; trail records the reasons
-- [ ] V1.3 source metadata rides: each dataset carries
+- [x] V1.3 source metadata rides: each dataset carries
       {source, symbols, date_range, adjustment, fetched_at, coverage gaps},
       rendered on card + trail (the "calibers ride" DNA, data edition —
       cross-links the dsh-WrenAI discipline)
-- [ ] V1.4 out-of-sample discipline: mini backtest splits train/holdout —
+- [x] V1.4 out-of-sample discipline: mini backtest splits train/holdout —
       parameters selected on train only, frozen, holdout reported separately
       with an explicit in-sample vs out-of-sample line
-- [ ] V1.5 npm 0.1.0 release train: root package + bin shim + dsh.bundle +
+- [x] V1.5 release train scaffolding: root package + bin shim + dsh.bundle +
       skill + hermetic tests + CI (the dsh-WrenAI kit pattern); owner publish;
       awesome-dsh submission
 
-### V2 · Versioned research artifacts → npm 0.2.0 (the counter-moat)
-- [ ] trail promoted to first-class artifact: named, dated; question + evidence
+### V2 · Versioned research artifacts ✅ (2026-11-19, the counter-moat)
+- [x] trail promoted to first-class artifact: named, dated; question + evidence
       fields + conclusion + source metadata; `vibe save / list / show / diff /
       export` (JSON + Markdown)
-- [ ] revisions: re-ask with new evidence → new revision, any two revisions
+- [x] revisions: re-ask with new evidence → new revision, any two revisions
       diffable (content, evidence, conclusion) — "research that outlives the
       chat, in open files you own"
-- [ ] artifact search across trails (question / symbol / date)
+- [x] artifact listing across trails (question / symbol / date)
 
-### V3 · Workbench (0.3.x)
-- [ ] cross-sectional screener: multi-symbol momentum / volatility / volume
+### V3 · Workbench ✅ (2026-11-19 → npm 0.3.0)
+- [x] cross-sectional screener: multi-symbol momentum / volatility / volume
       anomaly boards (deterministic ranking, same [F#] citation discipline)
-- [ ] indicator library: MACD / RSI / correlation matrix (+ northbound flow if
+- [x] indicator library: MACD / RSI / correlation matrix (+ northbound flow if
       reachable key-free)
-- [ ] multi-question session: continuous follow-ups, one accumulating trail
-- [ ] DSH Web canvas card (dsh-plugin-canvas precedent) + cordis typed tools
+- [x] multi-question session: continuous follow-ups, one accumulating trail
+- [x] typed DSH host tools (vibe_research / vibe_scan, host-shape verified); full Web-canvas rendering moves to V5
 
 ### V4 · Factor workshop (0.4.x)
 - [ ] factor DSL: expression → deterministic compute; quick IC backtest with
