@@ -5,6 +5,12 @@
   "bin": {
     "dsh-vibe-trading": "bin/dsh-vibe-trading.js"
   },
+  "type": "module",
+  "main": "./lib/index.js",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.0",
+    "@deepseek-ai/dsh-tools": ">=0.0.1-rc.1"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -13,6 +19,7 @@
   },
   "files": [
     "bin",
+    "lib",
     "scripts/*.py",
     "skills",
     "cordis.patch.yml",
