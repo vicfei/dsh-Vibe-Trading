@@ -3,8 +3,8 @@
 **Ask a market question → a deterministic pipeline plans, pulls data, computes, and
 explains — every number from code, every finding tagged to its computation.
 You get a terminal brief, a zero-dependency SVG chart card, and an auditable trail.**
-**提一个行情问题 → 确定性管道规划、取数、计算、解读——数字全部出自代码，
-结论逐条挂靠计算字段。终端纪要 + 零依赖 SVG 交互卡 + 可审计研究轨迹。**
+
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 [![DeepSeek Harness](https://img.shields.io/badge/DSH-plugin-4E6DD4)](https://github.com/deepseek-ai) [![License: MIT](https://img.shields.io/badge/license-MIT-3da639)](LICENSE)
 
@@ -27,14 +27,17 @@ You get a terminal brief, a zero-dependency SVG chart card, and an auditable tra
 ```bash
 git clone https://github.com/vicfei/dsh-Vibe-Trading && cd dsh-vibe-trading
 python3 scripts/vibe_research.py --save \
-  --question "茅台 vs 上证指数：近 20 日谁更弱，量价结构给出什么信号？" \
+  --question "Moutai vs the Shanghai index: which leg is weaker, and what does the price-volume structure say?" \
   --symbols sh600519,sh000001
+python3 scripts/vibe_research.py --question "茅台 vs 上证：量价结构谁更弱？" --lang zh   # zh fallback
 ```
 
 Real smoke run (2026-11-16, 6s, 2 LLM calls, temperature=0): identified the index as
-the weaker leg (ret20 −3.44% vs +9.73%), flagged “缩量上行 vs 缩量下行” structure,
-and **honestly declined to lean on the 4-trade backtest sample** — findings cite
-their computation fields throughout. Open `trails/*.html` for the chart card.
+the weaker leg (ret20 −3.44% vs +9.73%), flagged the shrinking-volume-up vs
+shrinking-volume-down structure, and **honestly declined to lean on the 4-trade
+backtest sample** — findings cite their computation fields throughout. Open
+`trails/*.html` for the chart card. Output is English-first; `--lang zh` switches
+user-facing labels (and the interpreter's language) to Chinese.
 
 ## What's in the box
 
