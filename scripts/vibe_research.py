@@ -9,13 +9,17 @@ Structure inspired by HKUDS/Vibe-Trading; the DSH-native differentiators:
 - three deliverables: terminal brief + zero-dependency inline SVG card +
   an auditable research trail (question/plan/data/computations/findings).
 
+Honesty contract: fields render as numbers or "n/a (reason)" — unavailable is
+never 0; every dataset's source metadata rides with it; the mini backtest
+reports in-sample and out-of-sample segments separately (frozen a-priori params).
+
 Pipeline (2 DeepSeek calls per run, temperature=0):
   LLM plans the exploration → deterministic layer (K-lines / stats / mini
   backtest / SVG) → LLM interprets, citing only the computed results.
 
 Usage:
   python3 scripts/vibe_research.py --question "Moutai vs the index: whose price-volume structure is weaker?" --symbols sh600519,sh000001
-  python3 scripts/vibe_research.py --ask "茅台 vs 大盘：量价结构谁更弱？" --lang zh
+  python3 scripts/vibe_research.py --question "茅台 vs 大盘：量价结构谁更弱？" --lang zh
 """
 import argparse, datetime as dt, json, os, re, subprocess, sys, time
 
@@ -36,11 +40,14 @@ STR = {
         "sym_line": "- **{sym}**: last {last} · 20d {ret20} · 60d {ret60} · {above} SMA60 · 30d vol {vol30} · from 120d peak {dd} · volume z {vz}",
         "above_yes": "above",
         "above_no": "below",
+        "src_line": "  - data: {src}",
         "bt_line": "  - trend backtest (SMA20/60 cross, full-position, no fees): {trades} trades · win rate {wr} · strategy {sumret} vs buy&hold {bh}",
+        "bt_train": "  - in-sample {span}: {trades} trades · strategy {sumret} vs buy&hold {bh}",
+        "bt_hold": "  - out-of-sample {span}: {trades} trades · strategy {sumret} vs buy&hold {bh}",
+        "oos_note_line": "── OOS discipline: {note}",
         "findings": "## Interpretation",
         "footer": "── SVG interactive card + research trail generated (--save writes files) · {secs}s",
         "saved": "→ {base}.html / .json",
-        "not_advice": "not investment advice",
         "computed_line": "computed {date} · deepseek-chat · temperature=0 · not investment advice",
         "plan_prompt": ("You are a research planner. Given the research question and the available symbols "
                         "(A-shares sh/sz+code, index sh000001, US us+code), output JSON "
@@ -48,8 +55,10 @@ STR = {
                         "Plan only, no conclusions."),
         "interpret_prompt": ("You are a research interpreter. Discipline: **you may ONLY cite the given computed "
                              "results** (cite stats/backtests fields as [S#]); inventing any number is forbidden; "
-                             "one [F#] per conclusion. State which parts of the question the results answer and "
-                             "which parts still lack data. Output markdown, at most 8 findings. Write in English."),
+                             "one [F#] per conclusion. Fields rendered as {\"unavailable\": reason} must be "
+                             "reported as unavailable with that reason — never guessed around. State which parts "
+                             "of the question the results answer and which parts still lack data. "
+                             "Output markdown, at most 8 findings. Write in English."),
     },
     "zh": {
         "fetch_fail": "⚠ {sym} 取数失败: {e}",
@@ -59,16 +68,20 @@ STR = {
         "sym_line": "- **{sym}**: 现价 {last} · 20日 {ret20} · 60日 {ret60} · {above} SMA60 · 30日波动 {vol30} · 距120日峰 {dd} · 量能z {vz}",
         "above_yes": "站稳",
         "above_no": "跌破",
+        "src_line": "  - 数据: {src}",
         "bt_line": "  - 趋势回测(20/60金叉,全仓无费): {trades} 笔 · 胜率 {wr} · 策略累计 {sumret} vs 持有 {bh}",
+        "bt_train": "  - 样本内 {span}: {trades} 笔 · 策略 {sumret} vs 持有 {bh}",
+        "bt_hold": "  - 样本外 {span}: {trades} 笔 · 策略 {sumret} vs 持有 {bh}",
+        "oos_note_line": "── 样本外纪律: {note}",
         "findings": "## 解读",
         "footer": "── SVG 交互卡与研究轨迹已生成（--save 落盘）· {secs}s",
         "saved": "→ {base}.html / .json",
-        "not_advice": "非投资建议",
         "computed_line": "computed {date} · deepseek-chat · temperature=0 · 非投资建议",
         "plan_prompt": ("你是投研规划员。给定研究问题与可用符号（A股 sh/sz+代码、指数 sh000001、美股 us+代码），"
                         "输出 JSON {\"plan\":\"不超过4步的探索路径\",\"focus\":\"每个符号各看什么\"}。只规划，不结论。"),
         "interpret_prompt": ("你是投研解读员。纪律：**只允许引用给定的计算结果**（[S#] 引用 stats/backtests 字段），"
-                             "禁止编造任何数字；每个结论一条 [F#]。指出计算结果回答了问题的哪部分、哪部分仍缺数据。"
+                             "禁止编造任何数字；每个结论一条 [F#]。以 {\"unavailable\": 原因} 呈现的字段必须如实"
+                             "报告为不可用并给出原因，不得绕过臆测。指出计算结果回答了问题的哪部分、哪部分仍缺数据。"
                              "输出 markdown，不超过 8 条结论。用中文写。"),
     },
 }
@@ -77,6 +90,21 @@ STR = {
 def t(key, **kw):
     s = STR[LANG].get(key, key)
     return s.format(**kw) if kw else s  # prompt strings carry literal JSON braces — never format them
+
+
+def f(v, spec):
+    """honest renderer: {'unavailable': reason} → 'n/a (reason)', else formatted number."""
+    if isinstance(v, dict) and "unavailable" in v:
+        return f"n/a ({v['unavailable']})"
+    return spec.format(v)
+
+
+def src_text(meta):
+    s = (f"{meta['source']} · {meta['adjustment']} · {meta['date_range'][0]} → {meta['date_range'][1]} "
+         f"· {meta['bars']}/{meta['requested_bars']} bars")
+    if meta.get("coverage_gaps"):
+        s += f" · {len(meta['coverage_gaps'])} coverage gap(s) > 10d"
+    return s
 
 
 def llm(sysmsg, user, json_out=False):
@@ -117,17 +145,18 @@ def main():
     plan = parse_json_loose(llm(t("plan_prompt"),
                                 f"Question: {args.question}\nSymbols: {args.symbols}", json_out=True))
 
-    rows_map, stats, backtests, svgs = {}, {}, {}, []
+    rows_map, datasets, stats, backtests, svgs = {}, {}, {}, {}, []
     for sym in [s.strip() for s in args.symbols.split(",") if s.strip()]:
         try:
-            rows = kline(sym)
+            rows, meta = kline(sym)
         except Exception as e:
             print(t("fetch_fail", sym=sym, e=e), file=sys.stderr)
             continue
         rows_map[sym] = rows
+        datasets[sym] = meta
         stats[sym] = stats_block(rows, sym)
         backtests[sym] = sma_cross_backtest(rows)
-        svgs.append(svg_chart(rows, sym))
+        svgs.append(svg_chart(rows, sym, meta))
 
     computed = json.dumps({"stats": stats, "backtests": backtests}, ensure_ascii=False, indent=1, default=str)
     findings = llm(t("interpret_prompt"),
@@ -144,15 +173,26 @@ def main():
     print(t("question", q=args.question) + "\n")
     print(f"{t('plan')}: {plan.get('plan')}\n")
     print(t("computed") + "\n")
+    oos_notes = set()
     for sym, st in stats.items():
-        print(t("sym_line", sym=sym, last=f"{st['last']:.2f}", ret20=f"{st['ret20']:+.1%}",
-                ret60=f"{st['ret60']:+.1%}" if st["ret60"] == st["ret60"] else "n/a",
-                above=t("above_yes") if st["above_sma60"] else t("above_no"),
-                vol30=f"{st['vol30']:.0%}", dd=f"{st['dd_from_120d_peak']:+.1%}", vz=f"{st['vol_z20']:+.1f}"))
+        above = st["above_sma60"]
+        print(t("sym_line", sym=sym, last=f(st["last"], "{:.2f}"), ret20=f(st["ret20"], "{:+.1%}"),
+                ret60=f(st["ret60"], "{:+.1%}"),
+                above=t("above_yes") if above is True else (t("above_no") if above is False else f(above, "{}")),
+                vol30=f(st["vol30"], "{:.0%}"), dd=f(st["dd_from_120d_peak"], "{:+.1%}"),
+                vz=f(st["vol_z20"], "{:+.1f}")))
+        print(t("src_line", src=src_text(datasets[sym])))
         bt = backtests[sym]
-        print(t("bt_line", trades=bt["trades"],
-                wr=f"{bt['win_rate']:.0%}" if bt["win_rate"] is not None else "—",
-                sumret=f"{bt['sum_strategy']:+.1%}", bh=f"{bt['buy_hold_260d']:+.1%}"))
+        print(t("bt_line", trades=bt["trades"], wr=f(bt["win_rate"], "{:.0%}"),
+                sumret=f(bt["sum_strategy"], "{:+.1%}"), bh=f(bt["buy_hold_260d"], "{:+.1%}")))
+        for seg_key, seg_str in (("train", "bt_train"), ("holdout", "bt_hold")):
+            seg = bt[seg_key]
+            span = "→".join(x for x in seg["span"] if x)
+            print(t(seg_str, span=span, trades=seg["trades"],
+                    sumret=f(seg["sum_strategy"], "{:+.1%}"), bh=f(seg["buy_hold"], "{:+.1%}")))
+        oos_notes.add(bt["oos_note"])
+    for note in oos_notes:
+        print(t("oos_note_line", note=note))
     print(f"\n{t('findings')}\n\n{findings}\n")
     print(t("footer", secs=int(time.time() - t0)))
 
@@ -161,7 +201,8 @@ def main():
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M")
         base = os.path.join(TRAILS, stamp)
         open(base + ".html", "w").write(html)
-        json.dump({"question": args.question, "plan": plan, "stats": stats,
+        json.dump({"schema": "research-trail/1", "question": args.question, "plan": plan,
+                   "datasets": datasets, "stats": stats,
                    "backtests": backtests, "findings": findings},
                   open(base + ".json", "w"), ensure_ascii=False, indent=1, default=str)
         print(t("saved", base=base), file=sys.stderr)
