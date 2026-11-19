@@ -12,5 +12,7 @@ jobs:
         run: python3 tests/test_engine.py
       - name: CLI shim smoke
         run: node bin/dsh-vibe-trading.js --help
+      - name: host plugin syntax
+        run: node --check lib/index.js
       - name: package dry-run
         run: npm publish --dry-run
