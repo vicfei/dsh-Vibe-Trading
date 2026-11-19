@@ -87,5 +87,50 @@ meta = {"source": "t", "adjustment": "qfq", "date_range": ["a", "b"], "bars": 3,
 svg = md.svg_chart(rows, "t", meta)
 check("svg carries source line", "source t · qfq" in svg and "3/4 bars" in svg)
 
+# 8. versioned artifacts: append-only revisions + deterministic diff (V2)
+import tempfile
+import artifacts as art
+with tempfile.TemporaryDirectory() as td:
+    os.environ["VIBE_TRAILS_DIR"] = td
+    try:
+        base_trail = {"schema": "research-trail/1", "question": "q1", "plan": {"plan": "p"},
+                      "datasets": {"sym": {"source": "t", "adjustment": "qfq", "date_range": ["a", "b"],
+                                           "bars": 10, "requested_bars": 320, "coverage_gaps": []}},
+                      "stats": {"sym": {"label": "sym", "last": 100.0, "ret20": 0.05,
+                                        "ret60": {"unavailable": "needs >= 61 closes, got 30"},
+                                        "above_sma60": True, "vol30": 0.2,
+                                        "dd_from_120d_peak": -0.1, "vol_z20": 0.5}},
+                      "backtests": {"sym": {"trades": 2, "sum_strategy": 0.1, "win_rate": {"unavailable": "2 trades < 10 minimum"},
+                                            "buy_hold_260d": 0.05, "trade_returns": [0.05, 0.05],
+                                            "train": {}, "holdout": {}, "oos_note": "apriori"}},
+                      "findings": "same findings text", "_html": "<html>r1</html>"}
+        rev1, _ = art.save("Demo Kit", dict(base_trail))
+        import copy
+        t2 = copy.deepcopy(base_trail)
+        t2["stats"]["sym"]["ret20"] = 0.08
+        t2["stats"]["sym"]["ret60"] = 0.20
+        t2["backtests"]["sym"]["trades"] = 3
+        t2["backtests"]["sym"]["sum_strategy"] = 0.12
+        t2["findings"] = "rewritten findings"
+        t2["_html"] = "<html>r2</html>"
+        rev2, _ = art.save("Demo Kit", t2)
+        check("revisions append 1,2", (rev1, rev2) == (1, 2))
+        _, ta = art.load("demo-kit", 1)
+        check("append-only: r1 unchanged", ta["stats"]["sym"]["ret20"] == 0.05
+              and isinstance(ta["stats"]["sym"]["ret60"], dict)
+              and "_html" not in ta)
+        d = art.diff_trails(ta, art.load("demo-kit", 2)[1])
+        check("diff: numeric delta", "ret20: " in d and "Δ" in d)
+        check("diff: became available", "became available" in d)
+        check("diff: backtest trades", "backtest.trades" in d and "2 → 3" in d)
+        check("diff: findings rewritten note", "findings rewritten" in d)
+        listed = art.list_artifacts()
+        check("list shows demo-kit r2", listed and listed[0]["name"] == "demo-kit" and listed[0]["revisions"] == 2)
+        meta2, tb = art.load("demo-kit", 2)
+        md_out = art.export_markdown(meta2, tb)
+        check("export markdown carries revision", "revision r2" in md_out and "not investment advice" in md_out)
+    finally:
+        os.environ.pop("VIBE_TRAILS_DIR", None)
+
 print("result:", "GREEN" if not FAILS else "RED (%d)" % len(FAILS))
 sys.exit(1 if FAILS else 0)

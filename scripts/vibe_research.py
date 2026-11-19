@@ -130,23 +130,13 @@ def parse_json_loose(s):
         return json.loads(re.sub(r"^```(json)?|```$", "", s.strip(), flags=re.M).strip())
 
 
-def main():
-    global LANG
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--question", required=True)
-    ap.add_argument("--symbols", required=True, help="comma-separated, e.g. sh600519,sh000001")
-    ap.add_argument("--save", action="store_true")
-    ap.add_argument("--lang", choices=("en", "zh"), default="en",
-                    help="output language (default en; zh is the fallback)")
-    args = ap.parse_args()
-    LANG = args.lang
+def run_research(question, symbols_csv):
+    """plan → deterministic layer → interpret. Returns the full trail dict (+_html)."""
     t0 = time.time()
-
     plan = parse_json_loose(llm(t("plan_prompt"),
-                                f"Question: {args.question}\nSymbols: {args.symbols}", json_out=True))
-
+                                f"Question: {question}\nSymbols: {symbols_csv}", json_out=True))
     rows_map, datasets, stats, backtests, svgs = {}, {}, {}, {}, []
-    for sym in [s.strip() for s in args.symbols.split(",") if s.strip()]:
+    for sym in [s.strip() for s in symbols_csv.split(",") if s.strip()]:
         try:
             rows, meta = kline(sym)
         except Exception as e:
@@ -157,53 +147,129 @@ def main():
         stats[sym] = stats_block(rows, sym)
         backtests[sym] = sma_cross_backtest(rows)
         svgs.append(svg_chart(rows, sym, meta))
-
+    if not rows_map:
+        raise SystemExit("no symbol data fetched — nothing to research")
     computed = json.dumps({"stats": stats, "backtests": backtests}, ensure_ascii=False, indent=1, default=str)
     findings = llm(t("interpret_prompt"),
-                   f"Research question: {args.question}\nPlan: {json.dumps(plan, ensure_ascii=False)}\n"
+                   f"Research question: {question}\nPlan: {json.dumps(plan, ensure_ascii=False)}\n"
                    f"Symbols covered: {list(rows_map)}\nComputed results:\n{computed}")
-
     html = ("<!doctype html><meta charset=utf-8><title>dsh-vibe-trading</title>"
             "<body style='font-family:monospace;max-width:760px;margin:20px auto'>"
-            f"<h3>{args.question}</h3><p>plan: {plan.get('plan', '')}</p>"
+            f"<h3>{question}</h3><p>plan: {plan.get('plan', '')}</p>"
             + "".join(f"<div>{s}</div>" for s in svgs)
             + f"<h4>findings</h4><div style='white-space:pre-wrap'>{findings}</div>"
             + f"<hr><small>{t('computed_line', date=dt.date.today())}</small></body>")
+    return {"schema": "research-trail/1", "question": question, "plan": plan,
+            "datasets": datasets, "stats": stats, "backtests": backtests,
+            "findings": findings, "secs": int(time.time() - t0), "_html": html}
 
-    print(t("question", q=args.question) + "\n")
-    print(f"{t('plan')}: {plan.get('plan')}\n")
+
+def render_brief(trail):
+    """Terminal brief, live runs and stored revisions alike."""
+    print(t("question", q=trail.get("question", "")) + "\n")
+    print(f"{t('plan')}: {trail.get('plan', {}).get('plan', '')}\n")
     print(t("computed") + "\n")
     oos_notes = set()
-    for sym, st in stats.items():
+    for sym, st in trail.get("stats", {}).items():
         above = st["above_sma60"]
         print(t("sym_line", sym=sym, last=f(st["last"], "{:.2f}"), ret20=f(st["ret20"], "{:+.1%}"),
                 ret60=f(st["ret60"], "{:+.1%}"),
                 above=t("above_yes") if above is True else (t("above_no") if above is False else f(above, "{}")),
                 vol30=f(st["vol30"], "{:.0%}"), dd=f(st["dd_from_120d_peak"], "{:+.1%}"),
                 vz=f(st["vol_z20"], "{:+.1f}")))
-        print(t("src_line", src=src_text(datasets[sym])))
-        bt = backtests[sym]
-        print(t("bt_line", trades=bt["trades"], wr=f(bt["win_rate"], "{:.0%}"),
-                sumret=f(bt["sum_strategy"], "{:+.1%}"), bh=f(bt["buy_hold_260d"], "{:+.1%}")))
-        for seg_key, seg_str in (("train", "bt_train"), ("holdout", "bt_hold")):
-            seg = bt[seg_key]
-            span = "→".join(x for x in seg["span"] if x)
-            print(t(seg_str, span=span, trades=seg["trades"],
-                    sumret=f(seg["sum_strategy"], "{:+.1%}"), bh=f(seg["buy_hold"], "{:+.1%}")))
-        oos_notes.add(bt["oos_note"])
+        if sym in trail.get("datasets", {}):
+            print(t("src_line", src=src_text(trail["datasets"][sym])))
+        bt = trail.get("backtests", {}).get(sym)
+        if bt:
+            print(t("bt_line", trades=bt["trades"], wr=f(bt["win_rate"], "{:.0%}"),
+                    sumret=f(bt["sum_strategy"], "{:+.1%}"), bh=f(bt["buy_hold_260d"], "{:+.1%}")))
+            for seg_key, seg_str in (("train", "bt_train"), ("holdout", "bt_hold")):
+                seg = bt[seg_key]
+                span = "→".join(x for x in seg["span"] if x)
+                print(t(seg_str, span=span, trades=seg["trades"],
+                        sumret=f(seg["sum_strategy"], "{:+.1%}"), bh=f(seg["buy_hold"], "{:+.1%}")))
+            oos_notes.add(bt["oos_note"])
     for note in oos_notes:
         print(t("oos_note_line", note=note))
-    print(f"\n{t('findings')}\n\n{findings}\n")
-    print(t("footer", secs=int(time.time() - t0)))
+    print(f"\n{t('findings')}\n\n{trail.get('findings', '')}\n")
+    art = trail.get("artifact")
+    if art:
+        print(f"── artifact {art['name']} · r{art['rev']} · saved {art['saved_at']}")
+    secs = trail.get("secs")
+    if secs is not None:
+        print(t("footer", secs=secs))
 
-    if args.save:
+
+def main():
+    global LANG
+    argv = sys.argv[1:]
+    if argv[:1] not in (["run"], ["artifacts"]) and argv:
+        argv = ["run"] + argv
+    ap = argparse.ArgumentParser(prog="dsh-vibe-trading")
+    sub = ap.add_subparsers(dest="cmd")
+    run = sub.add_parser("run", help="plan → data → compute → interpret (legacy flag surface)")
+    run.add_argument("--question", required=True)
+    run.add_argument("--symbols", required=True, help="comma-separated, e.g. sh600519,sh000001")
+    run.add_argument("--name", help="save as a named versioned artifact (appends a new revision)")
+    run.add_argument("--save", action="store_true", help="save an anonymous timestamped trail")
+    run.add_argument("--lang", choices=("en", "zh"), default="en",
+                     help="output language (default en; zh is the fallback)")
+    art = sub.add_parser("artifacts", help="versioned research artifacts (append-only)")
+    asub = art.add_subparsers(dest="action", required=True)
+    asub.add_parser("list")
+    sh = asub.add_parser("show")
+    sh.add_argument("name")
+    sh.add_argument("-r", type=int, default=None, help="revision (default: latest)")
+    df = asub.add_parser("diff")
+    df.add_argument("name")
+    df.add_argument("r1", type=int)
+    df.add_argument("r2", type=int)
+    ex = asub.add_parser("export")
+    ex.add_argument("name")
+    ex.add_argument("-r", type=int, default=None, help="revision (default: latest)")
+    ex.add_argument("--stdout", action="store_true")
+    args = ap.parse_args(argv)
+
+    if args.cmd == "artifacts":
+        import artifacts
+        if args.action == "list":
+            rows = artifacts.list_artifacts()
+            if not rows:
+                print("no artifacts yet — run with --name <slug> to create one")
+            for r in rows:
+                print(f"{r['name']}\tr{r['revisions']}\t{r['last_at']}\t{r['question'][:60]}")
+        elif args.action == "show":
+            meta, trail = artifacts.load(args.name, args.r)
+            render_brief(trail)
+        elif args.action == "diff":
+            _, a = artifacts.load(args.name, args.r1)
+            _, b = artifacts.load(args.name, args.r2)
+            print(f"## diff {args.name}: r{args.r1} → r{args.r2}\n")
+            print(artifacts.diff_trails(a, b))
+        elif args.action == "export":
+            meta, trail = artifacts.load(args.name, args.r)
+            md = artifacts.export_markdown(meta, trail)
+            if args.stdout:
+                print(md)
+            else:
+                out = f"{meta['name']}-r{trail.get('artifact', {}).get('rev', 'x')}.md"
+                open(out, "w").write(md)
+                print(f"→ {out}", file=sys.stderr)
+        return
+
+    LANG = args.lang
+    trail = run_research(args.question, args.symbols)
+    render_brief(trail)
+    if args.name:
+        import artifacts
+        rev, base = artifacts.save(args.name, trail)
+        print(t("saved", base=base) + f" (artifact {artifacts.slugify(args.name)} r{rev})", file=sys.stderr)
+    elif args.save:
         os.makedirs(TRAILS, exist_ok=True)
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M")
         base = os.path.join(TRAILS, stamp)
-        open(base + ".html", "w").write(html)
-        json.dump({"schema": "research-trail/1", "question": args.question, "plan": plan,
-                   "datasets": datasets, "stats": stats,
-                   "backtests": backtests, "findings": findings},
+        open(base + ".html", "w").write(trail["_html"])
+        json.dump({k: v for k, v in trail.items() if not k.startswith("_")},
                   open(base + ".json", "w"), ensure_ascii=False, indent=1, default=str)
         print(t("saved", base=base), file=sys.stderr)
 
