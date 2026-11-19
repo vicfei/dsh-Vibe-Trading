@@ -1,49 +1,99 @@
 # ROADMAP — dsh-vibe-trading
 
-北极星：三仓家族的第三块拼图，与 [dsh-TradingAgents](https://github.com/vicfei/dsh-TradingAgents)
-/ [dsh-ai-hedge-fund](https://github.com/vicfei/dsh-ai-hedge-fund) 同套打法，
-**30 天目标 100–300★**，吃 HKUDS/Vibe-Trading 搜索流量。
+North star: the third block of the three-repo family, same playbook as
+[dsh-TradingAgents](https://github.com/vicfei/dsh-TradingAgents) /
+[dsh-ai-hedge-fund](https://github.com/vicfei/dsh-ai-hedge-fund):
+**100–300★ in 30 days**, riding the HKUDS/Vibe-Trading (38.5k★) search gravity.
 
-## 定位纪律（本仓特有）
+## Positioning discipline (this repo's own)
 
-Vibe-Trading 本身是 MCP server——**插件必须赢在深度集成**：研究循环编排、
-确定性计算层（数字出自代码）、交互卡片、可审计轨迹。任何一版退化为
-"MCP 调用包装器"就失去了存在理由（README 定位表已明示这一点）。
+Upstream Vibe-Trading is itself an MCP server — **the plugin must win on deep
+integration**: orchestrated research loop, deterministic compute layer (numbers
+from code), interactive cards, auditable trail. Any release that degenerates
+into "MCP call wrapper" forfeits its reason to exist (the README table says so).
 
-## 星标策略（与前两仓一体）
+**Competitive read (2026-11-19 deep-dive, issue #1)**: the incumbent is not
+just big — its honesty engineering (grounding registry, versioned research
+artifacts, unavailable-not-zero, out-of-sample discipline, source-metadata
+disclosure) is converging on our soul. Response: **win the governance depth
+lane, never the breadth lane**. Explicitly renounced: broker connectors,
+desktop app, IM channels, 19-broker matrices. Four clean-room idea adoptions
+(ideas, not code — upstream is MIT but family discipline is net-room):
+versioned artifacts + revision diff, unavailable ≠ 0 ≠ empty-set semantics,
+train→freeze→holdout OOS discipline, data-source metadata riding with every
+dataset.
 
-1. 名字即流量：`vibe-trading` 全名保留；npm `dsh-vibe-trading` 已验可注册。
-2. 关键词矩阵：vibe-trading, deepseek-harness, dsh, quant-research, factor,
-   interactive-charts, technical-analysis, ic-memo。
-3. 钩子：**"问题进、研究包出"的 6 秒真实数据演示**（SVG 卡可直接贴帖）。
-4. 渠道：三仓同日组合拳，互链互推；本仓素材=交互卡截图对比裸 MCP 对话。
-5. npm 占位 0.0.1 立即发（owner 手动流程）。
+## Star strategy (shared with the other two repos)
 
-## 里程碑
+1. Name = traffic: keep `Vibe-Trading` full name; npm `dsh-vibe-trading` locked (0.0.1 live).
+2. Keyword matrix: vibe-trading, deepseek-harness, dsh, quant-research, factor,
+   interactive-charts, technical-analysis, ic-memo, research-trail.
+3. Hook: the **6-second real-data demo** ("question in, research pack out") —
+   the SVG card is post-ready; the revision-diff demo (V2) becomes hook #2.
+4. Channels: three-repo same-day combo, cross-links; this repo's asset =
+   interactive-card screenshot vs a raw-MCP conversation.
+5. awesome-dsh submission after npm 0.1.0 (family queue: #16227 / #16447 / #16751 precedent).
 
-### M0 · 引擎冒烟 ✅（2026-11-16）
-LLM 规划→确定性层（K线/指标/SMA交叉回测/内联 SVG）→LLM 解读（[F#] 挂靠字段，
-样本不足自曝）。真实数据 6s/场（茅台 vs 上证），轨迹 HTML+JSON 落盘。
+## Milestones
 
-### M0.5 · 发布包
-- [ ] README 打磨 + SVG 卡截图首屏 + npm 0.0.1 占位（手动）
-- [ ] 公开仓 topics + 三仓互链 + marketplace + 渠道清单（同日）
+### M0 · Engine smoke ✅ (2026-11-16)
+LLM plans → deterministic layer (K-lines / stats / SMA-cross backtest /
+inline SVG) → LLM interprets with [F#] field citations and small-sample
+self-exposure. Real data 6s per run (茅台 vs 上证), trail HTML+JSON on disk.
 
-### M1 · 工作台化（第 2-3 周）
-- [ ] 确定性筛选器（多标的横截面扫描：动量/波动/量能异常榜）
-- [ ] 指标库扩展（MACD/RSI/相关性矩阵/北向资金）+ 多问题会话（vibe 连续追问）
-- [ ] DSH Web canvas 卡集成（dsh-plugin-canvas 先例）+ cordis 插件化 → 0.1.0
+### V1 · Release train + engine hardening → npm 0.1.0 (next session)
+- [ ] V1.1 EN-first: engine output English default + `--lang zh` fallback;
+      README pure EN + `README.zh-CN.md` translation (international-first rule)
+- [ ] V1.2 honest-unavailable semantics: every stat/backtest field is
+      `{value | unavailable + reason}` (insufficient sample / missing data /
+      non-finite) — never 0, never silently dropped; trail records the reasons
+- [ ] V1.3 source metadata rides: each dataset carries
+      {source, symbols, date_range, adjustment, fetched_at, coverage gaps},
+      rendered on card + trail (the "calibers ride" DNA, data edition —
+      cross-links the dsh-WrenAI discipline)
+- [ ] V1.4 out-of-sample discipline: mini backtest splits train/holdout —
+      parameters selected on train only, frozen, holdout reported separately
+      with an explicit in-sample vs out-of-sample line
+- [ ] V1.5 npm 0.1.0 release train: root package + bin shim + dsh.bundle +
+      skill + hermetic tests + CI (the dsh-WrenAI kit pattern); owner publish;
+      awesome-dsh submission
 
-### M2 · 因子工坊（第 4-6 周）
-- [ ] 自定义因子 DSL（表达示→确定性计算）+ 因子快速回测
-- [ ] 与家族互通：研究轨迹 → 一键送 dsh-TradingAgents 开庭 / 基金会估值
+### V2 · Versioned research artifacts → npm 0.2.0 (the counter-moat)
+- [ ] trail promoted to first-class artifact: named, dated; question + evidence
+      fields + conclusion + source metadata; `vibe save / list / show / diff /
+      export` (JSON + Markdown)
+- [ ] revisions: re-ask with new evidence → new revision, any two revisions
+      diffable (content, evidence, conclusion) — "research that outlives the
+      chat, in open files you own"
+- [ ] artifact search across trails (question / symbol / date)
 
-### M3 · 生态（第 2 月起）
-- [ ] 轨迹格式标准化（IC-MEMO 姊妹件 RESEARCH-TRAIL spec）
-- [ ] 历史问题库：可检索的"问过的行情问题"资产
+### V3 · Workbench (0.3.x)
+- [ ] cross-sectional screener: multi-symbol momentum / volatility / volume
+      anomaly boards (deterministic ranking, same [F#] citation discipline)
+- [ ] indicator library: MACD / RSI / correlation matrix (+ northbound flow if
+      reachable key-free)
+- [ ] multi-question session: continuous follow-ups, one accumulating trail
+- [ ] DSH Web canvas card (dsh-plugin-canvas precedent) + cordis typed tools
 
-## 纪律（不可让步）
+### V4 · Factor workshop (0.4.x)
+- [ ] factor DSL: expression → deterministic compute; quick IC backtest with
+      walk-forward (OOS discipline inherited from V1.4)
+- [ ] family interop: one-key send a trail to dsh-TradingAgents as the
+      committee's evidence pack (IC-MEMO feeding); dsh-ai-hedge-fund persona
+      valuation consumes the same trail
 
-- 数字只出自确定性层；[F#] 挂靠字段；样本不足必须自曝；
-- 不做建议（解读结构，不喊方向）；SVG 卡零依赖（无 CDN）；
-- 轨迹永不删改（append-only 思想）。
+### V5 · Ecosystem (0.5.x)
+- [ ] RESEARCH-TRAIL spec (IC-MEMO's sister file): format versioned, stdlib
+      validator, CI enforcement — third family interchange format
+- [ ] searchable question history as an asset — persisted into a WeKnora
+      knowledge base via the family bridge pattern (zero bespoke storage)
+- [ ] monthly incumbent digest: track upstream releases, documented idea
+      intake (compete with a notebook, not vibes)
+
+## Discipline (non-negotiable)
+
+- Numbers come only from the deterministic layer; findings cite [F#] fields;
+  insufficient samples must self-expose; unavailable is never rendered as 0.
+- No advice (interpret structure, don't call direction); SVG cards stay
+  zero-dependency (no CDN).
+- Trails are append-only — revisions add, never rewrite.
