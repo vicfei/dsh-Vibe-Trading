@@ -47,7 +47,7 @@ STR = {
         "bt_hold": "  - out-of-sample {span}: {trades} trades · strategy {sumret} vs buy&hold {bh}",
         "oos_note_line": "── OOS discipline: {note}",
         "findings": "## Interpretation",
-        "footer": "── SVG interactive card + research trail generated (--save writes files) · {secs}s",
+        "footer": "── SVG interactive card + research trail generated (--save writes files) · {secs}s\n★ github.com/vicfei/dsh-Vibe-Trading",
         "saved": "→ {base}.html / .json",
         "computed_line": "computed {date} · deepseek-chat · temperature=0 · not investment advice",
         "plan_prompt": ("You are a research planner. Given the research question and the available symbols "
@@ -75,7 +75,7 @@ STR = {
         "bt_hold": "  - 样本外 {span}: {trades} 笔 · 策略 {sumret} vs 持有 {bh}",
         "oos_note_line": "── 样本外纪律: {note}",
         "findings": "## 解读",
-        "footer": "── SVG 交互卡与研究轨迹已生成（--save 落盘）· {secs}s",
+        "footer": "── SVG 交互卡与研究轨迹已生成（--save 落盘）· {secs}s\n★ github.com/vicfei/dsh-Vibe-Trading",
         "saved": "→ {base}.html / .json",
         "computed_line": "computed {date} · deepseek-chat · temperature=0 · 非投资建议",
         "plan_prompt": ("你是投研规划员。给定研究问题与可用符号（A股 sh/sz+代码、指数 sh000001、美股 us+代码），"
